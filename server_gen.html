@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Server List Generator PRO</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-color: #0f172a;
+    --panel-bg: rgba(30, 41, 59, 0.7);
+    --border-color: rgba(255, 255, 255, 0.1);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --tmdb-color: #0ea5e9;
+    --imdb-color: #f5c518;
+    --success: #10b981;
+    --error: #ef4444;
+    --font-ui: 'Poppins', sans-serif;
+    --font-mono: 'Fira Code', monospace;
+  }
+  
+  * { box-sizing: border-box; }
+  
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top right, #1e293b, #0f172a);
+    color: var(--text-main);
+    font-family: var(--font-ui);
+    padding: 40px 20px 80px;
+  }
+  
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 0 0 30px;
+    text-align: center;
+    background: linear-gradient(90deg, var(--tmdb-color), var(--imdb-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0px 4px 20px rgba(0,0,0,0.5);
+  }
+
+  h2 {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0 0 15px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+  }
+
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    margin-bottom: 30px;
+  }
+
+  /* Search Grid Inputs */
+  .search-inputs {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  @media(max-width: 768px) { 
+    .inputs, .search-inputs { grid-template-columns: 1fr; } 
+  }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .field input, .field select {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 2px solid var(--border-color);
+    color: var(--text-main);
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    transition: all 0.3s ease;
+    appearance: none; /* For select */
+  }
+  
+  .field input:focus, .field select:focus { 
+    outline: none; 
+    border-color: var(--tmdb-color); 
+    box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+  }
+  
+  .field.imdb input:focus { 
+    border-color: var(--imdb-color); 
+    box-shadow: 0 0 15px rgba(245, 197, 24, 0.3);
+  }
+
+  select option { background: var(--bg-color); color: var(--text-main); }
+
+  button.go {
+    width: 100%;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+  }
+  
+  button.go.search-btn { background: linear-gradient(135deg, #8b5cf6, #d946ef); box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4); }
+  button.go:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  button.go:active { transform: translateY(1px); }
+  button.go:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Movie Search Results Grid */
+  .movie-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 15px;
+    margin-top: 25px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+  }
+  .movie-grid.hidden { display: none; }
+  
+  /* Scrollbar */
+  .movie-grid::-webkit-scrollbar { width: 8px; }
+  .movie-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+  .movie-grid::-webkit-scrollbar-thumb { background: var(--tmdb-color); border-radius: 4px; }
+
+  .movie-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .movie-card:hover { transform: scale(1.05); border-color: var(--tmdb-color); box-shadow: 0 5px 15px rgba(14, 165, 233, 0.3); }
+  .movie-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #111; }
+  .movie-info { padding: 10px; text-align: center; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;}
+  .movie-title { font-size: 12px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .movie-year { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+  .status {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 15px;
+    min-height: 20px;
+    font-family: var(--font-mono);
+  }
+  .status.ok { color: var(--success); }
+  .status.err { color: var(--error); }
+  .status.busy { color: var(--tmdb-color); animation: pulse 1.5s infinite; }
+  .search-status { font-size: 12px; text-align: center; margin-top: 10px; color: var(--text-muted); }
+
+  @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+  .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media(max-width: 860px) { .sections { grid-template-columns: 1fr; } }
+
+  .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 0 5px; }
+  .tag { font-size: 12px; font-weight: 700; letter-spacing: 1px; padding: 6px 12px; border-radius: 8px; text-transform: uppercase; }
+  .tag.tmdb { background: rgba(14, 165, 233, 0.15); color: var(--tmdb-color); border: 1px solid rgba(14, 165, 233, 0.3); }
+  .tag.imdb { background: rgba(245, 197, 24, 0.15); color: var(--imdb-color); border: 1px solid rgba(245, 197, 24, 0.3); }
+  
+  .section-head .count { color: var(--text-muted); font-size: 13px; font-weight: 500; }
+  .section-head .id-echo { color: var(--text-main); font-size: 13px; font-family: var(--font-mono); margin-left: auto; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px;}
+
+  .list { background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 15px; padding: 16px; border-bottom: 1px solid var(--border-color); transition: background 0.2s ease; }
+  .row:hover { background: rgba(255, 255, 255, 0.03); }
+  .row:last-child { border-bottom: none; }
+  
+  .row .name { width: 140px; flex: none; color: var(--text-main); font-weight: 600; font-size: 14px; }
+  .row .url { flex: 1 1 auto; min-width: 0; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-family: var(--font-mono); }
+  .row .actions { display: flex; gap: 8px; flex: none; }
+  
+  .row button { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main); font-family: var(--font-ui); font-weight: 500; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; }
+  .row button:hover { background: rgba(255,255,255,0.1); border-color: var(--text-muted); }
+  .row button.copied { background: rgba(16, 185, 129, 0.2); color: var(--success); border-color: var(--success); }
+  
+  .empty { padding: 30px 20px; color: var(--text-muted); font-size: 14px; text-align: center; }
+
+  .preview-wrap { margin-top: 30px; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .preview-wrap.hidden { display: none; }
+  
+  .preview-bar { display: flex; justify-content: space-between; align-items: center; background: var(--panel-bg); padding: 12px 20px; border: 1px solid var(--border-color); border-bottom: none; border-radius: 12px 12px 0 0; font-family: var(--font-mono); font-size: 13px; color: var(--tmdb-color); }
+  .preview-bar button { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; font-family: var(--font-ui); font-weight: 600; font-size: 12px; padding: 6px 16px; border-radius: 6px; cursor: pointer; }
+  .preview-bar button:hover { background: rgba(239, 68, 68, 0.2); color: #fef2f2; }
+  
+  iframe { width: 100%; height: 600px; border: 1px solid var(--border-color); border-radius: 0 0 12px 12px; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Server List Generator PRO</h1>
+
+  <div class="panel">
+    <h2>Search & Discover Movies</h2>
+    <div class="search-inputs">
+      <div class="field">
+        <label>Movie Title</label>
+        <input id="searchQuery" placeholder="e.g. Inception (Leave blank to browse by year/lang)" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Release Year</label>
+        <input type="number" id="searchYear" placeholder="e.g. 2022" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Language / Industry</label>
+        <select id="searchLang">
+          <option value="">All Languages</option>
+          <option value="en">English (Hollywood)</option>
+          <option value="hi">Hindi (Bollywood)</option>
+          <option value="ta">Tamil</option>
+          <option value="te">Telugu</option>
+          <option value="ml">Malayalam</option>
+          <option value="kn">Kannada</option>
+          <option value="ko">Korean</option>
+          <option value="ja">Japanese</option>
+        </select>
+      </div>
+    </div>
+    <button class="go search-btn" id="searchBtn" onclick="searchMovies()">Search TMDB</button>
+    <div class="search-status" id="searchStatus"></div>
+    <div id="searchResults" class="movie-grid hidden"></div>
+  </div>
+
+  <div class="panel" id="generatorPanel">
+    <h2>Generator Inputs</h2>
+    <div class="inputs">
+      <div class="field">
+        <label>TMDB ID</label>
+        <input id="tmdbInput" placeholder="e.g. 775520" autocomplete="off">
+      </div>
+      <div class="field imdb">
+        <label>IMDB ID</label>
+        <input id="imdbInput" placeholder="e.g. tt2948356" autocomplete="off">
+      </div>
+    </div>
+    <button class="go" id="genBtn" onclick="generate()">Generate Links</button>
+    <div class="status" id="status">Ready. Select a movie above or enter an ID.</div>
+  </div>
+
+  <div class="sections">
+    <div class="section">
+      <div class="section-head">
+        <span class="tag tmdb">TMDB Servers</span>
+        <span class="count" id="tmdbCount">0 servers</span>
+        <span class="id-echo" id="tmdbEcho">-</span>
+      </div>
+      <div class="list" id="tmdbList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <span class="tag imdb">IMDB Servers</span>
+        <span class="count" id="imdbCount">0 servers</span>
+        <span class="id-echo" id="imdbEcho">-</span>
+      </div>
+      <div class="list" id="imdbList"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:30px;">
+    <h2>TV Show / Anime Inputs</h2>
+    <div class="inputs" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="field">
+        <label>TV TMDB ID</label>
+        <input id="tvInput" placeholder="e.g. 1399" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Season</label>
+        <input id="seasonInput" type="number" placeholder="e.g. 1" value="1" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Episode</label>
+        <input id="episodeInput" type="number" placeholder="e.g. 1" value="1" autocomplete="off">
+      </div>
+    </div>
+    <button class="go" id="tvBtn" onclick="generateTV()" style="background:linear-gradient(135deg,#10b981,#0ea5e9);">Generate TV Links</button>
+    <div class="status" id="tvStatus">Enter a TV TMDB ID, season and episode.</div>
+  </div>
+
+  <div class="sections" style="grid-template-columns:1fr;">
+    <div class="section">
+      <div class="section-head">
+        <span class="tag" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);">TV / Anime Servers</span>
+        <span class="count" id="tvCount">0 servers</span>
+        <span class="id-echo" id="tvEcho">-</span>
+      </div>
+      <div class="list" id="tvList"></div>
+    </div>
+  </div>
+
+  <div class="preview-wrap hidden" id="previewWrap">
+    <div class="preview-bar">
+      <span id="previewLabel"></span>
+      <button onclick="closePreview()">Close Player</button>
+    </div>
+    <iframe id="previewFrame" src="about:blank" allowfullscreen sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+  </div>
+</div>
+
+<script>
+// --- Configuration ---
+const API_KEY = "6fad3f86b8452ee232deb7977d7dcf58";
+const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
+
+// --- TMDB Servers ---
+const TMDB_SERVERS = [
+  { name: "VidSrc.sbs",   build: id => `https://vidsrc.sbs/embed/movie/${id}/` },
+  { name: "MultiEmbed",   build: id => `https://multiembed.mov/?video_id=${id}&tmdb=1` },
+  { name: "PrimeSrc",     build: id => `https://primesrc.me/embed/movie?tmdb=${id}` },
+  { name: "VidUp.to",     build: id => `https://vidup.to/movie/${id}` },
+  { name: "StreamIMDB",   build: id => `https://streamimdb.me/embed/movie/${id}` },
+  { name: "VidKing",      build: id => `https://www.vidking.net/embed/movie/${id}` },
+  { name: "VidCore",      build: id => `https://vidcore.net/movie/${id}` },
+  { name: "VixSrc",       build: id => `https://vixsrc.to/movie/${id}/` },
+  { name: "VAPlayer",     build: id => `https://vaplayer.ru/embed/movie/${id}` },
+  { name: "Videasy",      build: id => `https://player.videasy.net/movie/${id}?color=8B5CF6` },
+  { name: "VidFast.net",  build: id => `https://www.vidfast.net/movie/${id}` },
+  { name: "VidNest",      build: id => `https://vidnest.fun/movie/${id}` },
+  { name: "VSEmbed",      build: id => `https://vsembed.ru/embed/movie/${id}` },
+  { name: "VidLink.pro",  build: id => `https://vidlink.pro/movie/${id}` },
+  { name: "VidFast.pro",  build: id => `https://vidfast.pro/movie/${id}` },
+  { name: "Frembed",      build: id => `https://frembed.one/embed/movie/${id}` },
+  { name: "CinemaOS",     build: id => `https://cinemaos.tech/player/${id}` },
+  { name: "Mapple",       build: id => `https://mapple.uk/watch/movie/${id}` },
+  { name: "SpencerDevs",  build: id => `https://spencerdevs.xyz/movie/${id}` },
+  { name: "VidRock",      build: id => `https://vidrock.ru/embed/movie/${id}` },
+  { name: "YTHD",         build: id => `https://ythd.org/embed/${id}` },
+  { name: "VidZee",       build: id => `https://player.vidzee.wtf/embed/movie/${id}` },
+  { name: "Peachify",     build: id => `https://peachify.top/embed/movie/${id}` },
+  { name: "SmashyStream", build: id => `https://embed.smashystream.com/playere.php?tmdb=${id}` },
+  { name: "Nontongo",     build: id => `https://www.nontongo.win/embed/movie/${id}` },
+  { name: "111Movies",    build: id => `https://111movies.net/movie/${id}` },
+  { name: "2Embed",       build: id => `https://www.2embed.stream/embed/movie/${id}` },
+  { name: "RiveStream",   build: id => `https://rivestream.ru/watch?type=movie&id=${id}` }
+];
+
+// --- IMDB Servers ---
+const IMDB_SERVERS = [
+  { name: "MultiEmbed",   build: id => `https://multiembed.mov/?video_id=${id}` },
+  { name: "PrimeSrc",     build: id => `https://primesrc.me/embed/movie?imdb=${id}` },
+  { name: "VidUp.to",     build: id => `https://vidup.to/movie/${id}` },
+  { name: "StreamIMDB",   build: id => `https://streamimdb.me/embed/movie/${id}` },
+  { name: "VidCore",      build: id => `https://vidcore.net/movie/${id}` },
+  { name: "VixSrc",       build: id => `https://vixsrc.to/movie/${id}/` },
+  { name: "Gemma416",     build: id => `https://gemma416okl.com/play/${id}` },
+  { name: "VAPlayer",     build: id => `https://vaplayer.ru/embed/movie/${id}` },
+  { name: "VidFast.net",  build: id => `https://www.vidfast.net/movie/${id}` },
+  { name: "VidNest",      build: id => `https://vidnest.fun/movie/${id}` },
+  { name: "VSEmbed",      build: id => `https://vsembed.ru/embed/movie/${id}` },
+  { name: "VidLink.pro",  build: id => `https://vidlink.pro/movie/${id}` },
+  { name: "VidFast.pro",  build: id => `https://vidfast.pro/movie/${id}` },
+  { name: "InsertUnit",   build: id => `https://api.insertunit.ws/embed/imdb/${id}` },
+  { name: "Frembed",      build: id => `https://frembed.skin/embed/movie/${id}` },
+  { name: "111Movies",    build: id => `https://111movies.net/tv/${id}` },
+  { name: "Nontongo",     build: id => `https://www.nontongo.win/embed/movie/${id}` },
+  { name: "AnyEmbed",     build: id => `https://anyembed.xyz/embed/imdb-movie-${id}` },
+  { name: "VidZee",       build: id => `https://player.vidzee.wtf/embed/movie/${id}` },
+  { name: "YTHD",         build: id => `https://ythd.org/embed/${id}` },
+  { name: "RiveStream",   build: id => `https://rivestream.ru/watch?type=movie&id=${id}` }
+];
+
+// --- TV Show Servers (TMDB ID based, with season/episode placeholders) ---
+const TV_SERVERS = [
+  { name: "VidSrc.sbs",    build: (id,s,e) => `https://vidsrc.sbs/embed/tv/${id}/${s}/${e}` },
+  { name: "MultiEmbed",    build: (id,s,e) => `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${s}&e=${e}` },
+  { name: "PrimeSrc",      build: (id,s,e) => `https://primesrc.me/embed/tv?tmdb=${id}&season=${s}&episode=${e}` },
+  { name: "VidUp.to",      build: (id,s,e) => `https://vidup.to/tv/${id}/${s}/${e}` },
+  { name: "VidCore",       build: (id,s,e) => `https://vidcore.net/tv/${id}/${s}/${e}` },
+  { name: "VidSrc-Embed",  build: (id,s,e) => `https://vidsrc-embed.ru/embed/tv/${id}` },
+  { name: "StreamIMDB",    build: (id,s,e) => `https://streamimdb.me/embed/tv/${id}` },
+  { name: "VidKing",       build: (id,s,e) => `https://www.vidking.net/embed/tv/${id}/${s}/${e}` },
+  { name: "VixSrc",        build: (id,s,e) => `https://vixsrc.to/tv/${id}/${s}/${e}` },
+  { name: "Videasy",       build: (id,s,e) => `https://player.videasy.net/tv/${id}/${s}/${e}` },
+  { name: "VidFast.net",   build: (id,s,e) => `https://www.vidfast.net/tv/${id}/${s}/${e}` },
+  { name: "VidNest",       build: (id,s,e) => `https://vidnest.fun/tv/${id}/${s}/${e}` },
+  { name: "VidLink.pro",   build: (id,s,e) => `https://vidlink.pro/tv/${id}/${s}/${e}` },
+  { name: "VidFast.pro",   build: (id,s,e) => `https://vidfast.pro/tv/${id}/${s}/${e}` },
+  { name: "Frembed",       build: (id,s,e) => `https://frembed.skin/streaming/player?tmdb=${id}&type=serie&sa=${s}&ep=${e}&lang=en&skin=frembed` },
+  { name: "SpencerDevs",   build: (id,s,e) => `https://spencerdevs.xyz/tv/${id}/${s}/${e}` },
+  { name: "VidRock",       build: (id,s,e) => `https://vidrock.ru/tv/${id}/${s}/${e}` },
+  { name: "VidZee",        build: (id,s,e) => `https://player.vidzee.wtf/embed/tv/${id}/${s}/${e}` },
+  { name: "Peachify",      build: (id,s,e) => `https://peachify.top/embed/tv/${id}/${s}/${e}` },
+  { name: "Nontongo",      build: (id,s,e) => `https://www.nontongo.win/embed/tv/${id}/${s}/${e}` },
+  { name: "AnyEmbed",      build: (id,s,e) => `https://anyembed.xyz/embed/tmdb-tv-${id}-${s}-${e}` },
+  { name: "111Movies",     build: (id,s,e) => `https://111movies.net/tv/${id}/${s}/${e}` },
+  { name: "2Embed",        build: (id,s,e) => `https://www.2embed.stream/embed/tv/${id}/${s}/${e}` },
+  { name: "VAPlayer",      build: (id,s,e) => `https://vaplayer.ru/embed/tv/${id}/${s}/${e}` },
+  { name: "RiveStream",    build: (id,s,e) => `https://rivestream.ru/watch?type=tv&id=${id}&season=${s}&episode=${e}` },
+  { name: "CinemaOS",      build: (id,s,e) => `https://cinemaos.tech/tv/watch/${id}?season=${s}&episode=${e}` }
+];
+
+// --- Movie Search Logic ---
+async function searchMovies() {
+  const query = document.getElementById('searchQuery').value.trim();
+  const year = document.getElementById('searchYear').value.trim();
+  const lang = document.getElementById('searchLang').value;
+  const statusEl = document.getElementById('searchStatus');
+  const resultsEl = document.getElementById('searchResults');
+  const btn = document.getElementById('searchBtn');
+
+  if(!query && !year && !lang) {
+    statusEl.textContent = "Please enter at least one search filter.";
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = "Searching...";
+  resultsEl.classList.add('hidden');
+  resultsEl.innerHTML = '';
+
+  let url = '';
+  // If user typed a specific name, use Search API. Otherwise, use Discover API to browse.
+  if (query) {
+    url = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(query)}&include_adult=false`;
+    if(year) url += `&primary_release_year=${year}`;
+  } else {
+    url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&sort_by=popularity.desc&include_adult=false`;
+    if(year) url += `&primary_release_year=${year}`;
+    if(lang) url += `&with_original_language=${lang}`;
+  }
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if(data.results && data.results.length > 0) {
+      statusEl.textContent = `Found ${data.results.length} movies. Click one to generate links.`;
+      
+      data.results.forEach(movie => {
+        const releaseYear = movie.release_date ? movie.release_date.split('-')[0] : 'N/A';
+        const posterUrl = movie.poster_path ? IMAGE_BASE_URL + movie.poster_path : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" style="background:%23222"><text x="50%" y="50%" fill="%23666" text-anchor="middle" dy=".3em">No Image</text></svg>';
+        
+        const card = document.createElement('div');
+        card.className = 'movie-card';
+        card.onclick = () => selectMovieFromSearch(movie.id, movie.title);
+        card.innerHTML = `
+          <img src="${posterUrl}" alt="${movie.title}" loading="lazy">
+          <div class="movie-info">
+            <div class="movie-title">${movie.title}</div>
+            <div class="movie-year">${releaseYear}</div>
+          </div>
+        `;
+        resultsEl.appendChild(card);
+      });
+      resultsEl.classList.remove('hidden');
+    } else {
+      statusEl.textContent = "No movies found matching your criteria.";
+    }
+  } catch(e) {
+    statusEl.textContent = "Error fetching from TMDB: " + e.message;
+  }
+  
+  btn.disabled = false;
+}
+
+// Automatically populate inputs and generate when a search result is clicked
+function selectMovieFromSearch(tmdbId, title) {
+  // Clear IMDB, set TMDB
+  document.getElementById('tmdbInput').value = tmdbId;
+  document.getElementById('imdbInput').value = '';
+  
+  setStatus(`Selected: ${title}. Generating lists...`, 'busy');
+  
+  // Smooth scroll to generator
+  document.getElementById('generatorPanel').scrollIntoView({behavior: 'smooth'});
+  
+  // Trigger generation
+  generate();
+}
+
+// --- Generator Logic ---
+document.getElementById('tmdbInput').addEventListener('input', () => { document.getElementById('imdbInput').value = ''; });
+document.getElementById('imdbInput').addEventListener('input', () => { document.getElementById('tmdbInput').value = ''; });
+
+function extractTmdbId(raw){
+  raw = (raw || '').trim();
+  if(!raw) return null;
+  let m = raw.match(/themoviedb\.org\/movie\/(\d+)/i);
+  if(m) return m[1];
+  m = raw.match(/(\d{1,9})/);
+  return m ? m[1] : null;
+}
+
+function extractImdbId(raw){
+  raw = (raw || '').trim();
+  if(!raw) return null;
+  let m = raw.match(/(tt\d{6,9})/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+function setStatus(msg, cls){
+  const el = document.getElementById('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+async function tmdbToImdb(tmdbId){
+  const url = `https://api.themoviedb.org/3/movie/${tmdbId}/external_ids?api_key=${API_KEY}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`TMDB lookup failed (${res.status})`);
+  const data = await res.json();
+  if(!data.imdb_id) throw new Error('No IMDB ID returned for this TMDB ID');
+  return data.imdb_id;
+}
+
+async function imdbToTmdb(imdbId){
+  const url = `https://api.themoviedb.org/3/find/${imdbId}?api_key=${API_KEY}&external_source=imdb_id`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`TMDB lookup failed (${res.status})`);
+  const data = await res.json();
+  const hit = (data.movie_results && data.movie_results[0]) || null;
+  if(!hit) throw new Error('No TMDB match for this IMDB ID');
+  return String(hit.id);
+}
+
+function row(name, url){
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.innerHTML = `
+    <span class="name">${name}</span>
+    <span class="url">${url}</span>
+    <span class="actions">
+      <button onclick="loadPreview('${name.replace(/'/g,"")}','${url}')">Play</button>
+      <button onclick="copyUrl(this,'${url}')">Copy</button>
+      <a href="${url}" target="_blank" rel="noopener"><button type="button">Open</button></a>
+    </span>
+  `;
+  return div;
+}
+
+function renderTVList(tvId, season, episode) {
+  const tvList = document.getElementById('tvList');
+  tvList.innerHTML = '';
+  if (tvId) {
+    TV_SERVERS.forEach(s => tvList.appendChild(row(s.name, s.build(tvId, season, episode))));
+    document.getElementById('tvCount').textContent = `${TV_SERVERS.length} servers`;
+    document.getElementById('tvEcho').textContent = `TMDB: ${tvId} S${season}E${episode}`;
+  } else {
+    tvList.innerHTML = '<div class="empty">Enter a TV TMDB ID to build this list.</div>';
+    document.getElementById('tvCount').textContent = '0 servers';
+    document.getElementById('tvEcho').textContent = '-';
+  }
+}
+
+function generateTV() {
+  const raw = (document.getElementById('tvInput').value || '').trim();
+  const season = document.getElementById('seasonInput').value || '1';
+  const episode = document.getElementById('episodeInput').value || '1';
+  const tvStatus = document.getElementById('tvStatus');
+
+  let tvId = null;
+  const m = raw.match(/(\d{1,9})/);
+  if (m) tvId = m[1];
+
+  if (!tvId) {
+    tvStatus.textContent = 'Please enter a valid TV TMDB ID.';
+    tvStatus.className = 'status err';
+    renderTVList(null, season, episode);
+    return;
+  }
+  tvStatus.textContent = `TV links generated for TMDB ${tvId} S${season}E${episode}.`;
+  tvStatus.className = 'status ok';
+  renderTVList(tvId, season, episode);
+}
+
+function renderLists(tmdbId, imdbId){
+  const tmdbList = document.getElementById('tmdbList');
+  const imdbList = document.getElementById('imdbList');
+  tmdbList.innerHTML = '';
+  imdbList.innerHTML = '';
+
+  if(tmdbId){
+    TMDB_SERVERS.forEach(s => tmdbList.appendChild(row(s.name, s.build(tmdbId))));
+    document.getElementById('tmdbCount').textContent = `${TMDB_SERVERS.length} servers`;
+    document.getElementById('tmdbEcho').textContent = `TMDB: ${tmdbId}`;
+  } else {
+    tmdbList.innerHTML = '<div class="empty">Enter a TMDB ID to build this list.</div>';
+    document.getElementById('tmdbCount').textContent = '0 servers';
+    document.getElementById('tmdbEcho').textContent = '-';
+  }
+
+  if(imdbId){
+    IMDB_SERVERS.forEach(s => imdbList.appendChild(row(s.name, s.build(imdbId))));
+    document.getElementById('imdbCount').textContent = `${IMDB_SERVERS.length} servers`;
+    document.getElementById('imdbEcho').textContent = `IMDB: ${imdbId}`;
+  } else {
+    imdbList.innerHTML = '<div class="empty">Enter an IMDB ID to build this list.</div>';
+    document.getElementById('imdbCount').textContent = '0 servers';
+    document.getElementById('imdbEcho').textContent = '-';
+  }
+}
+
+async function generate(){
+  let tmdbId = extractTmdbId(document.getElementById('tmdbInput').value);
+  let imdbId = extractImdbId(document.getElementById('imdbInput').value);
+  const btn = document.getElementById('genBtn');
+
+  if(!tmdbId && !imdbId){
+    setStatus('Please enter at least one ID or search for a movie.', 'err');
+    renderLists(null, null);
+    return;
+  }
+
+  // Auto-convert missing side
+  if(tmdbId && !imdbId){
+    btn.disabled = true;
+    setStatus('Resolving IMDB ID...', 'busy');
+    try{
+      imdbId = await tmdbToImdb(tmdbId);
+      document.getElementById('imdbInput').value = imdbId;
+      setStatus(`Success! Lists generated.`, 'ok');
+    }catch(e){
+      setStatus(e.message, 'err');
+    }
+    btn.disabled = false;
+  } else if(imdbId && !tmdbId){
+    btn.disabled = true;
+    setStatus('Resolving TMDB ID...', 'busy');
+    try{
+      tmdbId = await imdbToTmdb(imdbId);
+      document.getElementById('tmdbInput').value = tmdbId;
+      setStatus(`Success! Lists generated.`, 'ok');
+    }catch(e){
+      setStatus(e.message, 'err');
+    }
+    btn.disabled = false;
+  } else {
+    setStatus('Lists Generated successfully.', 'ok');
+  }
+
+  renderLists(tmdbId, imdbId);
+}
+
+function copyUrl(btn, url){
+  navigator.clipboard.writeText(url).then(()=>{
+    const old = btn.textContent;
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 1200);
+  });
+}
+
+function loadPreview(name, url){
+  document.getElementById('previewWrap').classList.remove('hidden');
+  document.getElementById('previewLabel').textContent = `${name} — ${url}`;
+  document.getElementById('previewFrame').src = url;
+  document.getElementById('previewWrap').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function closePreview(){
+  document.getElementById('previewFrame').src = 'about:blank';
+  document.getElementById('previewWrap').classList.add('hidden');
+}
+
+renderLists(null, null);
+renderTVList(null, 1, 1);
+
+// Allow pressing 'Enter' on search inputs
+document.getElementById('searchQuery').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') searchMovies();
+});
+document.getElementById('searchYear').addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') searchMovies();
+});
+</script>
+</body>
+</html>
